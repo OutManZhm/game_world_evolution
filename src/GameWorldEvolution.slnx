@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="GWE.Domain/GWE.Domain.csproj" />
+  <Project Path="GWE.Repository/GWE.Repository.csproj" />
+  <Project Path="GWE.Service/GWE.Service.csproj" />
+  <Project Path="GWE.WinForms/GWE.WinForms.csproj" />
+</Solution>

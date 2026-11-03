@@ -1,0 +1,1811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>世界演化动线 · v0.5</title>
+<style>
+  :root {
+    --paper: #f4f2ea;
+    --card: #fffef9;
+    --ink: #19261f;
+    --muted: #68746b;
+    --faint: #8b958d;
+    --line: #d9ded4;
+    --line-strong: #c4ccc1;
+    --green: #1f6b52;
+    --amber: #a96f24;
+    --clay: #a94d35;
+    --indigo: #596188;
+    --shadow: 0 18px 50px rgba(25, 38, 31, .08);
+    --mono: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 92% -8%, rgba(169, 111, 36, .12), transparent 34rem),
+      radial-gradient(circle at -8% 14%, rgba(31, 107, 82, .10), transparent 32rem),
+      var(--paper);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(65, 83, 71, .035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(65, 83, 71, .035) 1px, transparent 1px);
+    background-size: 28px 28px;
+    z-index: 0;
+  }
+
+  button { font: inherit; }
+  button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1460px;
+    margin: 0 auto;
+    padding: 30px 34px 42px;
+  }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 36px;
+    padding: 24px 2px 28px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 4px rgba(31, 107, 82, .10);
+    animation: breathe 2.8s ease-in-out infinite;
+  }
+  h1 {
+    margin: 13px 0 13px;
+    font-size: clamp(43px, 5.5vw, 76px);
+    font-weight: 690;
+    letter-spacing: -.065em;
+    line-height: .95;
+  }
+  .lede {
+    max-width: 735px;
+    margin: 0;
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  .hero-side {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .version-stamp {
+    min-width: 194px;
+    padding: 13px 16px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    background: rgba(255, 254, 249, .72);
+    box-shadow: 0 8px 20px rgba(25, 38, 31, .04);
+  }
+  .version-stamp span {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--amber);
+  }
+  .version-stamp strong {
+    display: block;
+    margin: 2px 0 1px;
+    font-size: 18px;
+    letter-spacing: -.02em;
+  }
+  .version-stamp small {
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .play-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border: 1px solid var(--green);
+    border-radius: 10px;
+    color: #fff;
+    background: var(--green);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: transform .18s ease, background .18s ease;
+  }
+  .play-btn:hover { background: #185540; transform: translateY(-1px); }
+  .play-btn.is-playing { background: var(--ink); border-color: var(--ink); }
+  .play-icon {
+    width: 0;
+    height: 0;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 7px solid currentColor;
+  }
+  .play-btn.is-playing .play-icon {
+    width: 8px;
+    height: 8px;
+    border: 0;
+    background: currentColor;
+  }
+
+  /* ---------- Stats ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 17px 0 18px;
+  }
+  .stat {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    align-items: end;
+    padding: 13px 15px 12px;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    background: rgba(255, 254, 249, .68);
+  }
+  .stat span {
+    align-self: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: .03em;
+  }
+  .stat b {
+    grid-row: span 2;
+    font-family: var(--mono);
+    font-size: 25px;
+    font-weight: 600;
+    letter-spacing: -.04em;
+  }
+  .stat small {
+    color: var(--faint);
+    font-size: 10px;
+  }
+
+  /* ---------- Main layout ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(470px, .92fr) minmax(460px, 1.08fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .flow-card,
+  .detail,
+  .panel {
+    border: 1px solid var(--line);
+    background: rgba(255, 254, 249, .86);
+    box-shadow: var(--shadow);
+  }
+  .flow-card {
+    padding: 20px 20px 18px;
+    border-radius: 20px;
+  }
+  .section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 1px 2px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .section-kicker {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .16em;
+  }
+  .section-head h2 {
+    margin: 0;
+    font-size: 21px;
+    letter-spacing: -.035em;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px 12px;
+    padding-top: 7px;
+    color: var(--faint);
+    font-size: 10px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: #fff;
+  }
+  .legend-dot.once { border-style: dashed; background: var(--paper); }
+  .legend-dot.tick { border-color: var(--green); background: var(--green); }
+  .legend-dot.new { border-color: var(--indigo); background: var(--indigo); }
+
+  /* ---------- Flow ---------- */
+  .flow { padding-top: 10px; }
+  .stage-list { position: relative; }
+  .stage-list::before {
+    content: "";
+    position: absolute;
+    top: 23px;
+    bottom: 23px;
+    left: 23px;
+    width: 1px;
+    background: linear-gradient(to bottom, rgba(31, 107, 82, .06), rgba(31, 107, 82, .34), rgba(31, 107, 82, .06));
+  }
+
+  .genesis {
+    margin: 2px 0 0;
+    border-style: dashed;
+    background: rgba(246, 245, 237, .82);
+  }
+  .flow-bridge {
+    position: relative;
+    height: 28px;
+    margin-left: 23px;
+  }
+  .flow-bridge::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-left: 1px dashed var(--line-strong);
+  }
+  .flow-bridge span {
+    position: absolute;
+    top: 7px;
+    left: 13px;
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .03em;
+    white-space: nowrap;
+  }
+
+  .stage {
+    position: relative;
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) 16px;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    margin: 3px 0;
+    padding: 9px 9px 9px 0;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .2s ease, background .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+  .stage:hover {
+    border-color: var(--line);
+    background: rgba(255, 255, 252, .86);
+    transform: translateX(2px);
+  }
+  .stage.is-active {
+    border-color: var(--line-strong);
+    background: #fff;
+    box-shadow: 0 9px 25px rgba(25, 38, 31, .07), inset 3px 0 0 var(--c);
+  }
+  .stage-rail {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stage-dot {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--card);
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    transition: background .2s ease, color .2s ease, border-color .2s ease, transform .2s ease;
+  }
+  .stage:hover .stage-dot { border-color: var(--c); color: var(--c); }
+  .stage.is-active .stage-dot {
+    border-color: var(--c);
+    background: var(--c);
+    color: #fff;
+    transform: scale(1.06);
+    box-shadow: 0 0 0 5px rgba(255, 255, 252, .95), 0 0 0 6px var(--line);
+  }
+  .stage-body { min-width: 0; }
+  .stage-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+  .phase {
+    padding: 2px 6px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--muted);
+    background: #faf9f4;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+  .stage.is-active .phase { border-color: var(--c); color: var(--c); }
+  .stage-kicker {
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: .08em;
+  }
+  .io-count {
+    margin-left: auto;
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 9px;
+    white-space: nowrap;
+  }
+  .stage strong {
+    display: block;
+    overflow: hidden;
+    font-size: 14.5px;
+    font-weight: 650;
+    letter-spacing: -.015em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stage-desc {
+    display: block;
+    overflow: hidden;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: 11.5px;
+    line-height: 1.45;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stage-chev {
+    color: var(--line-strong);
+    font-family: var(--mono);
+    font-size: 17px;
+    text-align: center;
+    transition: color .2s ease, transform .2s ease;
+  }
+  .stage:hover .stage-chev,
+  .stage.is-active .stage-chev { color: var(--c); transform: translateX(1px); }
+
+  .stage.branch {
+    margin: 6px 0 7px 20px;
+    width: calc(100% - 20px);
+    border-style: dashed;
+    background: linear-gradient(90deg, rgba(89, 97, 136, .055), rgba(89, 97, 136, .012));
+  }
+  .stage.branch .stage-dot { border-radius: 11px; }
+  .stage.branch::before {
+    content: "SIDE LOOP";
+    position: absolute;
+    top: -6px;
+    left: 56px;
+    padding: 0 5px;
+    color: var(--indigo);
+    background: var(--card);
+    font-family: var(--mono);
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: .12em;
+  }
+
+  .loopback {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin: 14px 2px 2px 23px;
+    padding: 10px 12px 10px 15px;
+    border-left: 1px dashed var(--green);
+    border-radius: 0 10px 10px 0;
+    background: rgba(31, 107, 82, .045);
+  }
+  .loop-mark {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border: 1px solid rgba(31, 107, 82, .35);
+    border-radius: 50%;
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 15px;
+  }
+  .loopback strong { display: block; font-size: 11.5px; }
+  .loopback small { display: block; margin-top: 1px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+  /* ---------- Detail ---------- */
+  .detail {
+    --c: var(--green);
+    position: sticky;
+    top: 18px;
+    max-height: calc(100vh - 36px);
+    overflow: auto;
+    border-radius: 20px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  .detail::-webkit-scrollbar { width: 6px; }
+  .detail::-webkit-scrollbar-thumb { border-radius: 99px; background: var(--line-strong); }
+  .detail::before {
+    content: "";
+    display: block;
+    height: 4px;
+    background: var(--c);
+  }
+  .detail-top {
+    padding: 21px 23px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 9.5px;
+  }
+  .detail-phase {
+    padding: 3px 7px;
+    border: 1px solid var(--c);
+    border-radius: 5px;
+    color: var(--c);
+    background: #fff;
+    font-weight: 650;
+  }
+  .detail-index { margin-left: auto; letter-spacing: .08em; }
+  .detail h2 {
+    margin: 0 0 7px;
+    font-size: 27px;
+    line-height: 1.15;
+    letter-spacing: -.045em;
+  }
+  .detail-summary {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.72;
+  }
+  .io-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 13px;
+  }
+  .io-strip span {
+    padding: 3px 7px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--muted);
+    background: #fbfaf5;
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+
+  .route {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #faf9f3;
+    color: var(--faint);
+    font-size: 9.5px;
+    line-height: 1.3;
+  }
+  .route b { color: var(--ink); font-weight: 600; }
+  .route-arrow { color: var(--line-strong); font-family: var(--mono); }
+
+  .detail-body { padding: 19px 23px 21px; }
+  .block + .block { margin-top: 18px; }
+  .block h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 12px;
+    letter-spacing: .02em;
+  }
+  .block h3 span {
+    color: var(--c);
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+  .block p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.75;
+  }
+
+  .io-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 9px;
+  }
+  .io-box {
+    padding: 11px 12px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fcfbf6;
+  }
+  .io-box h4 {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 7px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+  }
+  .io-box h4::before {
+    content: "";
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+  .io-box.out h4::before { background: var(--amber); }
+  .io-box ul,
+  .constraint ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .io-box li {
+    position: relative;
+    padding-left: 10px;
+    color: var(--ink);
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+  .io-box li + li { margin-top: 5px; }
+  .io-box li::before {
+    content: "";
+    position: absolute;
+    top: .62em;
+    left: 0;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--line-strong);
+  }
+
+  .table-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 9px;
+    margin-bottom: 8px;
+  }
+  .table-head h3 { margin: 0; }
+  .tabs {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #f3f2eb;
+  }
+  .tab {
+    padding: 4px 7px;
+    border: 0;
+    border-radius: 5px;
+    color: var(--faint);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 8.5px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--ink); }
+  .tab.is-active {
+    color: var(--ink);
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(25, 38, 31, .10);
+  }
+
+  .table-list {
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: #fffefb;
+  }
+  .table-row {
+    padding: 9px 10px 8px;
+    border-top: 1px solid #eceee8;
+  }
+  .table-row:first-child { border-top: 0; }
+  .table-row:hover { background: #fbfbf4; }
+  .table-headline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+  .table-row code {
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 650;
+    letter-spacing: -.01em;
+  }
+  .badge {
+    padding: 1px 4px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 7.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+  }
+  .badge.new { border-color: rgba(89, 97, 136, .35); color: var(--indigo); background: rgba(89, 97, 136, .07); }
+  .badge.field { border-color: rgba(169, 111, 36, .35); color: var(--amber); background: rgba(169, 111, 36, .07); }
+  .badge.config { border-style: dashed; color: var(--faint); }
+  .table-role {
+    margin-top: 2px;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.45;
+  }
+  .table-fields {
+    margin-top: 2px;
+    color: #89938b;
+    font-family: var(--mono);
+    font-size: 8.5px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .empty {
+    padding: 12px;
+    color: var(--faint);
+    font-size: 10.5px;
+  }
+
+  .constraint {
+    margin-top: 14px;
+    padding: 12px 13px 11px;
+    border: 1px solid rgba(169, 111, 36, .20);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 8px 8px 0;
+    background: #fbf5e9;
+  }
+  .constraint h4 {
+    margin: 0 0 6px;
+    color: var(--amber);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .1em;
+  }
+  .constraint li {
+    position: relative;
+    padding-left: 11px;
+    color: #67563d;
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+  .constraint li + li { margin-top: 4px; }
+  .constraint li::before {
+    content: "";
+    position: absolute;
+    top: .63em;
+    left: 0;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #c6924f;
+  }
+  .source {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    margin-top: 13px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line);
+    color: var(--faint);
+    font-size: 9px;
+    line-height: 1.55;
+  }
+  .source a { color: var(--green); text-decoration: none; border-bottom: 1px dotted rgba(31, 107, 82, .4); }
+  .source a:hover { border-bottom-style: solid; }
+
+  /* ---------- Lower panels ---------- */
+  .lower {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(300px, .55fr);
+    gap: 18px;
+    margin-top: 18px;
+  }
+  .panel { padding: 18px 19px; border-radius: 16px; box-shadow: 0 12px 35px rgba(25, 38, 31, .045); }
+  .panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 11px;
+  }
+  .panel-head h2 {
+    margin: 0;
+    font-size: 16px;
+    letter-spacing: -.025em;
+  }
+  .panel-head p {
+    max-width: 550px;
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: 10.5px;
+    line-height: 1.55;
+  }
+  .tiny-label {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--indigo);
+    font-family: var(--mono);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: .14em;
+  }
+  .increment-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 7px;
+  }
+  .increment-card {
+    min-height: 116px;
+    padding: 10px 9px 9px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    color: inherit;
+    background: #fcfbf6;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color .18s ease, transform .18s ease, background .18s ease;
+  }
+  .increment-card:hover {
+    border-color: rgba(89, 97, 136, .42);
+    background: #fff;
+    transform: translateY(-2px);
+  }
+  .increment-card code {
+    display: block;
+    overflow: hidden;
+    color: var(--indigo);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .increment-card strong {
+    display: block;
+    margin: 5px 0 4px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .increment-card small {
+    display: block;
+    color: var(--muted);
+    font-size: 9px;
+    line-height: 1.45;
+  }
+  .increment-card .mini-flow {
+    display: block;
+    margin-top: 6px;
+    padding-top: 5px;
+    border-top: 1px dashed var(--line);
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 7.5px;
+    line-height: 1.45;
+  }
+
+  .principle-list { display: grid; gap: 8px; }
+  .principle-item {
+    display: grid;
+    grid-template-columns: 21px 1fr;
+    gap: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+  }
+  .principle-item:first-child { padding-top: 0; border-top: 0; }
+  .principle-num {
+    color: var(--green);
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .principle-item strong { display: block; font-size: 10.5px; line-height: 1.4; }
+  .principle-item small { display: block; margin-top: 2px; color: var(--muted); font-size: 9.5px; line-height: 1.55; }
+
+  footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 20px;
+    padding: 13px 2px 0;
+    border-top: 1px solid var(--line-strong);
+    color: var(--faint);
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .55; transform: scale(.8); }
+  }
+  @keyframes stagePulse {
+    0% { box-shadow: 0 0 0 0 rgba(31, 107, 82, .18); }
+    70% { box-shadow: 0 0 0 9px rgba(31, 107, 82, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(31, 107, 82, 0); }
+  }
+  .stage.is-playing { animation: stagePulse 1.8s ease-out infinite; }
+
+  @media (max-width: 1080px) {
+    .page { padding: 24px 22px 34px; }
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .detail { position: relative; top: 0; max-height: none; }
+    .lower { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .page { padding: 20px 14px 30px; }
+    .hero { display: block; padding-top: 16px; }
+    h1 { font-size: 48px; }
+    .hero-side { flex-direction: row; align-items: stretch; margin-top: 18px; }
+    .version-stamp { flex: 1; min-width: 0; }
+    .play-btn { flex: 0 0 auto; padding-inline: 17px; }
+    .stats { grid-template-columns: 1fr 1fr; }
+    .section-head { display: block; }
+    .legend { justify-content: flex-start; padding-top: 8px; }
+    .flow-card { padding: 16px 12px 15px; }
+    .stage { grid-template-columns: 42px minmax(0, 1fr) 12px; }
+    .stage-dot { width: 34px; height: 34px; font-size: 9px; }
+    .stage strong { font-size: 13px; }
+    .stage-desc { font-size: 10.5px; }
+    .stage.branch { margin-left: 12px; width: calc(100% - 12px); }
+    .io-grid { grid-template-columns: 1fr; }
+    .detail-top, .detail-body { padding-left: 17px; padding-right: 17px; }
+    .detail h2 { font-size: 23px; }
+    .increment-grid { grid-template-columns: 1fr 1fr; }
+    .increment-card { min-height: 106px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <div class="hero-main">
+      <div class="eyebrow"><span class="live-dot"></span> World Evolution Engine / v0.5</div>
+      <h1>世界演化动线</h1>
+      <p class="lede">从世界生成，到每个月的 P0–P12 管线，再到一次原子提交。点击任一节点，查看它从数据模型读取什么，又写回什么。制作与学术不是外挂系统，它们从 NPC 行动循环里长出来。</p>
+    </div>
+    <div class="hero-side">
+      <div class="version-stamp">
+        <span>EXTRACTED VERSION</span>
+        <strong>v0.5 · 奥术神座</strong>
+        <small>40 TABLES / 2026-11-02</small>
+      </div>
+      <button class="play-btn" id="playBtn" type="button" aria-pressed="false">
+        <span class="play-icon" aria-hidden="true"></span>
+        <span id="playLabel">播放动线</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="stats" aria-label="版本概览">
+    <div class="stat"><span>SQLite 表</span><b>40</b><small>v0.4 的 35 张 + 5 张新表</small></div>
+    <div class="stat"><span>月度阶段</span><b>P0–P12</b><small>阶段之间设屏障</small></div>
+    <div class="stat"><span>行动循环</span><b>×4</b><small>P5–P7 最多四轮</small></div>
+    <div class="stat"><span>提交方式</span><b>1 TX</b><small>P12 原子提交</small></div>
+  </section>
+
+  <div class="layout">
+    <section class="flow-card" aria-label="演化主线">
+      <div class="section-head">
+        <div>
+          <span class="section-kicker">MAINLINE / MONTHLY TICK</span>
+          <h2>月度演化主线</h2>
+        </div>
+        <div class="legend" aria-label="图例">
+          <span><i class="legend-dot once"></i>一次生成</span>
+          <span><i class="legend-dot tick"></i>每 tick</span>
+          <span><i class="legend-dot new"></i>v0.5 旁路</span>
+        </div>
+      </div>
+
+      <div class="flow">
+        <button class="stage genesis" data-stage="genesis" type="button" aria-pressed="false" style="--c:#6b715e">
+          <span class="stage-rail"><span class="stage-dot">00</span></span>
+          <span class="stage-body">
+            <span class="stage-meta">
+              <span class="phase">ONCE</span>
+              <span class="stage-kicker">GENESIS</span>
+              <span class="io-count">配置 → 9 表</span>
+            </span>
+            <strong>世界生成</strong>
+            <span class="stage-desc">空间、势力、人口、资质天赋、关系网、经济初值与初始张力</span>
+          </span>
+          <span class="stage-chev" aria-hidden="true">›</span>
+        </button>
+
+        <div class="flow-bridge"><span>生成完成 · 进入 tick 1</span></div>
+
+        <div class="stage-list" id="stageList"></div>
+
+        <div class="loopback">
+          <span class="loop-mark" aria-hidden="true">↺</span>
+          <div>
+            <strong>下一 tick：回到 P0</strong>
+            <small>P12 提交成功后，世界从新快照继续。P10/P11 产生的新主动行为最早在下一 tick 执行。</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="detail" id="detail" aria-live="polite" aria-label="阶段数据详情"></aside>
+  </div>
+
+  <div class="lower">
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <span class="tiny-label">v0.5 DELTA</span>
+          <h2>新版本增加了什么</h2>
+          <p>五张表不是五个孤立模块，而是一条从「材料 + 设施」到「物品 / 知识」再到「身份与传播」的闭环。</p>
+        </div>
+      </div>
+      <div class="increment-grid" id="incrementGrid">
+        <button class="increment-card" data-stage="branch" type="button">
+          <code>item_instance</code>
+          <strong>物品实例</strong>
+          <small>物品定义留在配置，实例才可追溯、继承、校验门槛。</small>
+          <span class="mini-flow">配方 + 材料 + 设施 → 可追溯实例</span>
+        </button>
+        <button class="increment-card" data-stage="branch" type="button">
+          <code>craft_job</code>
+          <strong>制作工作</strong>
+          <small>炼金、药剂、魔法阵、卷轴共用一条多 tick 制作链。</small>
+          <span class="mini-flow">action_plan → 进度 / 品质 / 产出</span>
+        </button>
+        <button class="increment-card" data-stage="branch" type="button">
+          <code>research_work</code>
+          <strong>研究项目</strong>
+          <small>从假设、实验、成稿到投稿，研究不是一次判定。</small>
+          <span class="mini-flow">主题 + 设施 + 文献 → 阶段化成果</span>
+        </button>
+        <button class="increment-card" data-stage="branch" type="button">
+          <code>publication</code>
+          <strong>发表与评审</strong>
+          <small>成果进入评审队列，先发表者获得新颖度。</small>
+          <span class="mini-flow">成稿 + 评审 → verdict / credit / point</span>
+        </button>
+        <button class="increment-card" data-stage="branch" type="button">
+          <code>arcana_ledger</code>
+          <strong>学术双账</strong>
+          <small>credit 只增不减，point 可消费，二者不能混成一个字段。</small>
+          <span class="mini-flow">发表 / 兑换 → 双账流水 → arcana_rank</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <span class="tiny-label">DATA PRINCIPLE</span>
+          <h2>读写的三条边界</h2>
+          <p>图表里每一个「输入 / 输出」，都落在这三层之一。</p>
+        </div>
+      </div>
+      <div class="principle-list">
+        <div class="principle-item">
+          <span class="principle-num">01</span>
+          <div><strong>内容定义不进运行状态</strong><small>职业、配方、词条、卡池、期刊走 JSON/YAML；表里只存 key 与版本引用。</small></div>
+        </div>
+        <div class="principle-item">
+          <span class="principle-num">02</span>
+          <div><strong>运行表只保存已经发生的事实</strong><small>不预存「可能发生」；效果必须经过 effect_ledger 和唯一幂等键。</small></div>
+        </div>
+        <div class="principle-item">
+          <span class="principle-num">03</span>
+          <div><strong>投影只读，事实可重建</strong><small>人物生平、编年史、事件卡从运行事实生成，不反向修改世界。</small></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    <span>世界演化系统复刻设计文档 v0.5 · 奥术神座提取版</span>
+    <span>图表按第 4 / 6 / 8 / 10 章整理 · 数据表 40 张</span>
+  </footer>
+</div>
+
+<script>
+  const STAGES = [
+    {
+      id: 'genesis',
+      num: '00',
+      phase: 'ONCE',
+      kicker: 'GENESIS',
+      title: '世界生成',
+      color: '#6b715e',
+      short: '空间、势力、人口、资质天赋、关系网、经济初值与初始张力',
+      summary: '先造出一个能自己运转的世界：空间、势力、人口、核心 NPC、五项资质与天赋、初始关系网、经济初值和 3–5 个初始张力。生成完成后先静默跑 12 tick，确认不会一开局就崩。',
+      detail: '这是唯一一次「从配置到运行状态」的大批量写入。顺序不能反：先有空间与组织，才有 NPC 的归属；先有资质列，天赋的 attribute_delta 才有地方落；先有天赋，初始关系才受「天生亲和」这类词条影响。',
+      duration: '一次性',
+      upstream: '种子 + 配置',
+      downstream: 'tick 1',
+      inputs: [
+        '世界种子、规则版本与全部内容配置',
+        '地图、势力、人口、职业与经济初值',
+        '天赋词条与卡池配置；玩家出身选择',
+        '首版规模：300 个独立 NPC'
+      ],
+      outputs: [
+        'region → locale → site 三级空间',
+        'faction 与初始边界、资源分布',
+        'npc + npc_trait + 五项资质',
+        '初始 relation、经济库存、3–5 个 tension',
+        'tick 0 的可提交世界状态'
+      ],
+      constraints: [
+        '资质先于天赋：没有 comprehension 等五列，天赋的 attribute_delta 无法落库。',
+        '天赋必须通过点数预算、互斥与稀有度上限校验。',
+        '生成后静默 12 tick：检查人口崩溃、境界同质、全员仇敌、家族垄断职位。'
+      ],
+      source: '5.7 世界生成；6.16 资质与天赋词条；附录 D.5',
+      anchor: '#5',
+      readTables: [
+        { name: 'content_config', kind: 'config', role: '地图、职业、配方、词条、卡池与初始世界参数', fields: 'JSON / YAML · 配置注册表 · 不复制进运行表' }
+      ],
+      writeTables: [
+        { name: 'world', role: '世界根：seed、tick、pressure、config_version', fields: 'id · seed · tick · pressure · config_version · state_json' },
+        { name: 'region', role: '区域与地形', fields: 'id · name_key · terrain · danger · owner_faction' },
+        { name: 'locale', role: '城镇、村落、门派驻地', fields: 'id · region_id · kind · x/y · population · owner_faction' },
+        { name: 'site', role: '设施与资源点', fields: 'id · locale_id · kind · owner_faction · resource_json · integrity' },
+        { name: 'faction', role: '组织、势力与初始立场', fields: 'id · kind · leader_id · headquarters · resources_json · stance_json' },
+        { name: 'npc', role: '具名人物与五项资质', fields: 'id · faction_id · role_id · constitution · comprehension · charm · physique · willpower' },
+        { name: 'npc_trait', role: '天赋持有关系', fields: 'npc_id · trait_key · origin · draw_pool · acquired_tick · state' },
+        { name: 'relation', role: '初始亲缘、师承、好友、仇敌与债务', fields: 'from_id · to_id · kind · affinity · trust · debt' },
+        { name: 'tension', role: '初始矛盾', fields: 'id · type · subject_ids · stakes · urgency · state' }
+      ]
+    },
+    {
+      id: 'p0p2',
+      num: '01',
+      phase: 'P0–P2',
+      kicker: 'TIME / ENV',
+      title: '锁回合 · 推时间 · 算环境',
+      color: '#2f7d67',
+      short: '锁定输入、推进月历、启停环境、先结算生产与消耗',
+      summary: 'P0 锁定上一已提交状态并记录起始哈希；P1 推进月份与季节；P2 先结束到期环境、启动新环境、应用持续修正，再结算资源生产、消耗、工程进度和到期预约。',
+      detail: '环境必须先于 NPC 需求结算，否则居民会在旱灾已经发生之后仍按旧粮价做决定。P2 结束后，P4 读到的才是本回合真实可用的资源与健康基础。',
+      duration: '每 tick',
+      upstream: '世界生成',
+      downstream: '组织战略',
+      inputs: [
+        '上一已提交 tick、状态哈希与内容版本',
+        '到期 event_schedule；Active 环境实例与修正',
+        '设施、库存、工程进度、到期预约',
+        '环境范围选择器与修正叠加策略'
+      ],
+      outputs: [
+        'TickContext：本回合内存工作副本',
+        '新月 / 季节参数与环境实例启停',
+        '本回合环境修正值与资源净变化',
+        '先结算生产 / 消费，再把结果交给 P4'
+      ],
+      constraints: [
+        '阶段之间设屏障：上一阶段效果全部提交后，下一阶段才能读取新状态。',
+        '临时修正按实例维护，结束只删修正，不回滚死亡、债务、已消耗库存与迁徙。',
+        '同一 (instanceId, tick, effectKey, targetId) 幂等，不能重复生效。'
+      ],
+      source: '4.2 月度管线；8.13 定时世界环境事件',
+      anchor: '#4-tick',
+      readTables: [
+        { name: 'world', role: '读取当前 tick、压力与规则版本', fields: 'seed · tick · pressure · config_version' },
+        { name: 'event_schedule', role: '查找本回合到期调度', fields: 'template_id · next_due_tick · interval_ticks · occurrence_index · state' },
+        { name: 'environment_instance', role: '读取活动实例与结束边界', fields: 'schedule_id · start_tick · end_tick_exclusive · state · scope_json' },
+        { name: 'environment_modifier', role: '读取当回合临时修正', fields: 'instance_id · target_kind · target_id · effect_key · value_fixed · stack_group' },
+        { name: 'site', role: '设施产出、完整度与占用', fields: 'kind · resource_json · integrity · owner_faction' },
+        { name: 'locale', role: '地区人口与暴露范围', fields: 'population · danger · owner_faction' },
+        { name: 'faction', role: '组织资源与领地基础', fields: 'resources_json · goals_json · stance_json' },
+        { name: 'npc', role: '库存消耗与健康基础', fields: 'health · inventory_json · location_id' }
+      ],
+      writeTables: [
+        { name: 'world', role: '写入本回合日历与压力工作值', fields: 'tick · pressure · state_json' },
+        { name: 'event_schedule', role: '推进 next_due_tick 与 occurrence_index', fields: 'next_due_tick · occurrence_index · state' },
+        { name: 'environment_instance', role: '创建 / 结束发生实例', fields: 'start_tick · end_tick_exclusive · state' },
+        { name: 'environment_modifier', role: '写入本回合有效修正', fields: 'instance_id · effect_key · value_fixed · stack_group' },
+        { name: 'effect_ledger', role: '记录已应用或拒绝的环境效果', fields: 'effect_id · source_event_id · tick · group_id · status' },
+        { name: 'site', role: '回写资源、完整度与工程进度', fields: 'resource_json · integrity · state_json' },
+        { name: 'locale', role: '回写地区资源与暴露变化', fields: 'population · state_json' },
+        { name: 'faction', role: '回写组织资源与产出', fields: 'resources_json · state_json' },
+        { name: 'npc', role: '回写消耗与健康变化', fields: 'health · inventory_json · state_json' }
+      ]
+    },
+    {
+      id: 'p3',
+      num: '02',
+      phase: 'P3',
+      kicker: 'FACTION AI',
+      title: '组织战略',
+      color: '#a36b2c',
+      short: '季度战略与月度执行：招募、建设、贸易、战争与委派',
+      summary: '组织先于个人行动：宗门、城镇、家族评估资源、威胁与机会，形成季度目标与本月执行意图。首领通过 directive 把目标压给下属，但每个下属仍要自己判断是否服从。',
+      detail: '这一阶段决定 NPC 的机会与约束。组织不直接替成员行动，它产生目标、职位、合同与资源约束，然后进入 P4 的个体需求计算。',
+      duration: '每 tick',
+      upstream: '环境 / 资源',
+      downstream: '需求刷新',
+      inputs: [
+        '组织资源、目标、立场与领地',
+        '首领 authority / reach 与可用职位',
+        '张力池、近期事件、贸易与威胁',
+        '季度战略缓存与本月预算'
+      ],
+      outputs: [
+        '招募、建设、贸易、战争等组织意图',
+        'directive 委派与目标约束',
+        '资源分配、职位与合同需求',
+        '进入 NPC 候选池的组织动机'
+      ],
+      constraints: [
+        '委派深度 ≤ 2，A 委派 B 后，B 不得把同目标委派回 A。',
+        '单个 issuer 每 tick 最多下发 3 条命令，避免命令风暴。',
+        '发令占用发起者与执行者的槽位和 AP，不产生免费行动。'
+      ],
+      source: '5.5 组织与领地；6.13.3 委派；4.2 P3',
+      anchor: '#5',
+      readTables: [
+        { name: 'faction', role: '组织目标、资源、立场与总部', fields: 'kind · leader_id · resources_json · goals_json · stance_json' },
+        { name: 'npc', role: '首领与成员的权限、职位和影响半径', fields: 'authority · reach · office_id · faction_id · ap_budget' },
+        { name: 'site', role: '设施、资源点与建设目标', fields: 'kind · owner_faction · resource_json · integrity' },
+        { name: 'locale', role: '领地人口、危险度与控制权', fields: 'population · danger · owner_faction' },
+        { name: 'tension', role: '未解决矛盾与紧迫度', fields: 'type · subject_ids · urgency · deadline_tick · state' },
+        { name: 'event_log', role: '近期事实与组织可见局势', fields: 'type · actor_ids · location_id · visibility · salience' },
+        { name: 'relation', role: '首领与成员之间的服从基础', fields: 'affinity · trust · fear · debt' }
+      ],
+      writeTables: [
+        { name: 'faction', role: '更新季度目标、资源分配与立场', fields: 'goals_json · resources_json · stance_json · state_json' },
+        { name: 'directive', role: '写入委派命令与截止时间', fields: 'issuer_id · assignee_id · objective_json · priority · deadline_tick · depth · state' },
+        { name: 'action_plan', role: '把组织目标转成可执行计划', fields: 'npc_id · goal_id · revision · state · created_tick' },
+        { name: 'effect_ledger', role: '记录资源划拨与组织效果', fields: 'source_event_id · group_id · status · payload_json' }
+      ]
+    },
+    {
+      id: 'p4',
+      num: '03',
+      phase: 'P4',
+      kicker: 'NEEDS / BELIEF',
+      title: '需求刷新',
+      color: '#3f6f88',
+      short: '全体 NPC 更新需求、健康、资源、目标有效性与行动候选',
+      summary: 'P4 更新每个 NPC 的健康、资源、修为、安全、归属、声望与恩怨，形成本回合需求向量。目标失效会触发重规划；长期计划最多每 3 tick 完整重算，但执行校验每 tick 都做。',
+      detail: '这是「世界状态」变成「行动动机」的转换点。AI 只能基于自己的信念做选择：他知道消息、记得事件、相信某个版本，但不能读取隐藏真值。',
+      duration: '每 tick',
+      upstream: '组织约束',
+      downstream: '行动循环',
+      inputs: [
+        'P2 的资源 / 环境结果与 P3 的组织约束',
+        'npc 状态、五项资质、npc_trait、arcana_rank',
+        'relation / memory / npc_belief / knowledge_delivery',
+        'item_instance、库存与学术账余额'
+      ],
+      outputs: [
+        '七类需求向量与新紧迫度',
+        '目标有效性判定、重规划或放弃',
+        '本回合可执行步骤与候选池',
+        'npc_turn 起始状态与预算'
+      ],
+      constraints: [
+        'AI 只能基于信念做选择，不能读取隐藏真值。',
+        'AP 上限 6；主动槽位上限 4；高身份不获得额外自然天数。',
+        '天赋加成在生成时算定；运行期新增天赋在下个 tick 开头重算。'
+      ],
+      source: '6.3 需求与目标；6.4 感知与信念；6.11 LOD 与预算；6.14',
+      anchor: '#6-npc',
+      readTables: [
+        { name: 'npc', role: '状态、资质、双轨能力与预算', fields: 'health · realm · power · arcana_rank · constitution · comprehension · needs_json' },
+        { name: 'npc_trait', role: '读取当前生效的天赋修正', fields: 'trait_key · origin · state · draw_pool' },
+        { name: 'relation', role: '亲属、师承、债务与仇敌', fields: 'affinity · trust · fear · debt · intimacy' },
+        { name: 'memory', role: '本人记住的事件与情绪权重', fields: 'event_id · emotional_weight · source · created_tick' },
+        { name: 'npc_belief', role: '本人相信的事实版本', fields: 'belief_key · confidence · updated_tick · belief_json' },
+        { name: 'knowledge_delivery', role: '上回合送达的消息', fields: 'sender_id · recipient_id · deliver_tick · confidence · state' },
+        { name: 'item_instance', role: '可用装备、材料与耐久', fields: 'def_key · owner_id · quality · durability · charges' },
+        { name: 'arcana_ledger', role: '学术点数余额与积分累计', fields: 'kind · delta · balance_after · tick' },
+        { name: 'action_plan', role: '当前计划、目标与修订号', fields: 'goal_id · revision · state · created_tick' },
+        { name: 'action_step', role: '计划步骤、进度与前置', fields: 'kind · state · work_required · progress · definition_json' }
+      ],
+      writeTables: [
+        { name: 'npc', role: '更新需求、健康、资源与状态', fields: 'needs_json · health · state_json · ap_budget' },
+        { name: 'action_plan', role: '重规划、修订或终止目标', fields: 'goal_id · revision · state · created_tick' },
+        { name: 'npc_turn', role: '写入本回合起始状态与预算', fields: 'npc_id · tick · status · ap_budget · time_budget · trace_json' },
+        { name: 'effect_ledger', role: '记录需求变化产生的领域效果', fields: 'source_event_id · tick · group_id · status' }
+      ]
+    },
+    {
+      id: 'p5p7',
+      num: '04',
+      phase: 'P5–P7',
+      kicker: 'INTENT / MOVE / ACT',
+      title: '意图 · 移动 · 交互',
+      color: '#a94d35',
+      short: '最多四轮：选一步、移动、结算；复合操作原子生效',
+      summary: 'P5–P7 是有界执行循环，最多 4 轮。每轮每个 NPC 只选当前可执行的一步，随后移动、配对、交互与结算。成功后才解锁下一步；失败按实际消耗计费，不退款。',
+      detail: '这是整套系统里唯一会真正改变世界状态的行动段。所有行为都先产生 Effect，再按优先级、事件 ID 与 effectSeq 稳定排序，在阶段末统一应用。交易、赠与、抢夺必须作为效果组全成或全不成。',
+      duration: '最多 ×4 轮',
+      upstream: '需求 / 计划',
+      downstream: '生死 / 继承',
+      inputs: [
+        '需求、目标、计划步骤与依赖',
+        'AP / 时间预算、4 个主动槽位',
+        '位置、权限、库存、健康与双方预约',
+        '配方 / 研究主题 / 设施；战斗与社交真值'
+      ],
+      outputs: [
+        'intent：本轮选择的行动',
+        'action_execution：实际尝试、消耗与结果',
+        '移动、交易、伤害、关系与记忆变化',
+        'craft_job / research_work 进度，item_instance / publication',
+        'PendingEncounter 或 tick_checkpoint'
+      ],
+      constraints: [
+        '最多 4 轮；每轮每人只选一步，所有 NPC 完成本轮后才进入下一轮。',
+        '复合操作一个效果组，全成或全不成；失败按实际消耗计费，不退款。',
+        '重伤与死亡标记即时生效，阻止同一 tick 后续意图与关系创建。',
+        '玩家意图在 P5 替换候选，其余感知、执行、结算走同一套代码。'
+      ],
+      source: '4.3 效果队列与事务；6.7 行动结算；6.14 完整行动链路',
+      anchor: '#4-tick',
+      readTables: [
+        { name: 'npc_turn', role: '读取剩余 AP、时间与槽位', fields: 'ap_budget · ap_spent · slots_used · status' },
+        { name: 'action_plan', role: '读取当前目标与计划状态', fields: 'goal_id · revision · state' },
+        { name: 'action_step', role: '读取步骤、进度与前置', fields: 'kind · state · work_required · progress · definition_json' },
+        { name: 'action_dependency', role: '校验步骤依赖是否已解锁', fields: 'step_id · prerequisite_id' },
+        { name: 'directive', role: '读取委派目标、优先级与截止', fields: 'issuer_id · assignee_id · objective_json · priority · deadline_tick' },
+        { name: 'npc', role: '读取位置、健康、权限与能力', fields: 'location_id · health · realm · power · authority · reach' },
+        { name: 'relation', role: '读取双方关系与信任基础', fields: 'affinity · trust · fear · debt · intimacy' },
+        { name: 'npc_belief', role: '读取行动者相信的目标状态', fields: 'belief_key · confidence · belief_json' },
+        { name: 'item_instance', role: '读取库存、装备、耐久与剩余次数', fields: 'def_key · quality · durability · charges · owner_id' },
+        { name: 'site', role: '读取设施占用与制作条件', fields: 'kind · integrity · owner_faction' },
+        { name: 'craft_job', role: '读取进行中的制作进度', fields: 'recipe_key · progress · work_required · state' },
+        { name: 'research_work', role: '读取研究阶段与进度', fields: 'topic_key · stage · progress · work_required' },
+        { name: 'publication', role: '读取投稿 / 评审状态', fields: 'journal_key · verdict · submitted_tick · reviewed_tick' }
+      ],
+      writeTables: [
+        { name: 'intent', role: '写入本轮选择的行动', fields: 'npc_id · tick · seq · kind · target_id · cost · priority · score · state' },
+        { name: 'action_execution', role: '写入实际尝试、消耗与成败', fields: 'step_id · npc_id · tick · round · state · ap_spent · time_spent · results_json' },
+        { name: 'action_step', role: '累计进度、切换状态', fields: 'state · progress · work_required' },
+        { name: 'npc', role: '回写健康、位置、资源与状态', fields: 'health · location_id · inventory_json · state_json' },
+        { name: 'relation', role: '回写好感、信任、恐惧与债务', fields: 'affinity · trust · fear · debt · last_contact' },
+        { name: 'memory', role: '写入亲历事件的记忆与情绪权重', fields: 'npc_id · event_id · emotional_weight · source' },
+        { name: 'item_instance', role: '转移、消耗或生成物品实例', fields: 'owner_kind · owner_id · quality · durability · source_craft_id' },
+        { name: 'craft_job', role: '推进制作，记录品质与产出', fields: 'progress · quality · state · finished_tick · output_item_id' },
+        { name: 'research_work', role: '推进研究阶段', fields: 'stage · progress · closed_tick' },
+        { name: 'publication', role: '提交投稿与评审结果', fields: 'verdict · credit_awarded · point_awarded · novelty' },
+        { name: 'effect_ledger', role: '登记效果组与已应用键', fields: 'source_event_id · tick · group_id · status · payload_json' },
+        { name: 'event_log', role: '把行动结果写成事实事件', fields: 'type · actor_ids · target_ids · location_id · facts_json · visibility' },
+        { name: 'npc_turn', role: '累计实际 AP / 时间消耗与原因', fields: 'ap_spent · time_spent · slots_used · trace_json' }
+      ]
+    },
+    {
+      id: 'branch',
+      num: 'B',
+      phase: 'v0.5 BRANCH',
+      kicker: 'CRAFT / RESEARCH',
+      title: '制作 · 研究 · 发表',
+      color: '#596188',
+      short: '炼金、药剂、魔法阵、卷轴，以及论文—评审—期刊—学术账',
+      summary: '制作与研究都从 P5–P7 的行动链长出来，不另开一套 AP。制作产出 item_instance，研究产出 publication；发表换来的 credit 决定 arcana_rank，point 用于兑换配方、材料与设施时间。',
+      detail: '这是 v0.5 的核心增量。它不是「多了一个技能」，而是给世界增加了第二条地位轨道：实战强的人不一定学术高，学术高的人也不一定打得过谁。两轨允许背离，冲突和机会都由此产生。',
+      duration: '旁路',
+      upstream: 'P5–P7 行动',
+      downstream: 'P10 传播',
+      inputs: [
+        '配方 / 研究主题（配置）+ 设施 site + 材料',
+        '制作者资质、技能、天赋与设施等级',
+        '文献、已有成果、期刊与评审机构',
+        'AP / 时间（由 action_plan 统一记账）'
+      ],
+      outputs: [
+        'craft_job → item_instance（品质 / 耐久 / 来源）',
+        'research_work：hypothesis → experiment → writeup → submitted → closed',
+        'publication：verdict、novelty、citations',
+        'arcana_ledger：credit（只增）/ point（可花）→ arcana_rank',
+        '新成果经 knowledge_delivery 延迟传播'
+      ],
+      constraints: [
+        '材料开工即扣，失败不退；设施是稀缺资源，同一时刻只能服务有限工作。',
+        'credit 只增不减，point 可消费；arcana_rank 是 credit 的缓存，不是独立真值。',
+        '学术积分不继承；物品、配方、未完成研究可以继承。',
+        '不建独立锻造 / 附魔 / 魔药系统，统一并入制作与物品实例。'
+      ],
+      source: '6.17 制作、物品与知识系统；6.17.2 双轨身份；6.17.6 评审与期刊',
+      anchor: '#6-npc',
+      readTables: [
+        { name: 'site', role: '实验室、工坊、能量间等制作设施', fields: 'kind · integrity · owner_faction · resource_json' },
+        { name: 'npc', role: '制作者资质、技能、学术轨与 AP', fields: 'comprehension · physique · realm · power · arcana_rank · ap_budget' },
+        { name: 'npc_trait', role: '制作成功率、研究速度与学派亲和', fields: 'trait_key · origin · state' },
+        { name: 'item_instance', role: '材料、工具与已有成品', fields: 'def_key · quality · durability · charges · owner_id' },
+        { name: 'craft_job', role: '读取进行中的制作与配方', fields: 'recipe_key · progress · work_required · state · quality' },
+        { name: 'research_work', role: '读取研究主题、阶段与进度', fields: 'topic_key · field · approach · stage · progress' },
+        { name: 'publication', role: '读取已有成果、新颖度与引用', fields: 'journal_key · verdict · novelty · citations' },
+        { name: 'faction', role: '评审机构、学院与学派立场', fields: 'kind · leader_id · stance_json · resources_json' },
+        { name: 'knowledge_delivery', role: '读取期刊订阅与消息送达', fields: 'source_event_id · recipient_id · deliver_tick · state' },
+        { name: 'arcana_ledger', role: '读取积分累计与点数余额', fields: 'kind · delta · balance_after' }
+      ],
+      writeTables: [
+        { name: 'craft_job', role: '新建、推进或结束制作工作', fields: 'crafter_id · recipe_key · facility_id · plan_id · progress · quality · state · output_item_id', new: true },
+        { name: 'item_instance', role: '生成成品、转移材料与记录来源', fields: 'def_key · owner_kind · owner_id · quality · durability · source_craft_id', new: true },
+        { name: 'research_work', role: '推进研究阶段与返工记录', fields: 'owner_id · topic_key · field · stage · progress · facility_id', new: true },
+        { name: 'publication', role: '写入发表、评审结论与积分发放', fields: 'research_id · author_id · journal_key · verdict · credit_awarded · point_awarded · novelty', new: true },
+        { name: 'arcana_ledger', role: '记录 credit / point 双账流水', fields: 'npc_id · tick · kind · delta · balance_after · publication_id', new: true },
+        { name: 'npc', role: '回写学术等级缓存与新身份', fields: 'arcana_rank · state_json', newField: true },
+        { name: 'knowledge_delivery', role: '把新成果延迟投递给订阅者', fields: 'sender_id · recipient_id · channel · sent_tick · deliver_tick · confidence' },
+        { name: 'event_log', role: '记录制作事故、突破、抢发与评审', fields: 'type · actor_ids · location_id · visibility · facts_json' },
+        { name: 'effect_ledger', role: '登记材料消耗与产出效果', fields: 'source_event_id · tick · group_id · status' }
+      ]
+    },
+    {
+      id: 'p8p9',
+      num: '05',
+      phase: 'P8–P9',
+      kicker: 'LIFECYCLE / SUCCESSION',
+      title: '生死 · 继承 · 补缺',
+      color: '#6b715e',
+      short: '伤病、生育、衰老、死亡，随后处理财产、职位、债务与仇恨',
+      summary: 'P8 结算伤病、怀孕、生育、衰老与死亡；P9 处理财产、职位、功法、债务与仇恨的继承，并补上空缺。死亡在 P7 先标记，真正清理与继承留到这两步。',
+      detail: '顺序很重要：先继承、再传播。只有死亡后的财产和职位变化已经落定，其他人才能在本 tick 正确感知「谁上位了」「谁拿到了那把剑」。',
+      duration: '每 tick',
+      upstream: '行动结果',
+      downstream: '传播',
+      inputs: [
+        'P7 的 health / dead_pending / incapacitated',
+        '年龄、伤病、怀孕、生育、衰老',
+        '财产、职位、债务、仇恨、天赋与配方',
+        '家族与组织继承规则'
+      ],
+      outputs: [
+        '出生 / 死亡与人口变化',
+        '财富、职位、物品、天赋、债务的继承',
+        '空缺补选与身份变化',
+        '继承争议的 tension 种子'
+      ],
+      constraints: [
+        '真正清理与继承留到 P8/P9；P7 先阻止死亡者继续行动。',
+        '学术积分不继承；物品、配方、未完成研究可以继承。',
+        '职位空缺率目标 < 10%，空位必须走补选而不是凭空刷新。'
+      ],
+      source: '6.9 生命周期；6.10 继承；4.2 P8–P9',
+      anchor: '#6-npc',
+      readTables: [
+        { name: 'npc', role: '读取年龄、健康、怀孕与死亡标记', fields: 'birth_tick · death_tick · health · state_json' },
+        { name: 'relation', role: '读取亲属、师承、债务与仇恨', fields: 'from_id · to_id · kind · debt · affinity' },
+        { name: 'faction', role: '读取职位、继任规则与空缺', fields: 'leader_id · goals_json · stance_json' },
+        { name: 'item_instance', role: '读取可继承的财产与物品', fields: 'owner_id · def_key · quality · bound_to' },
+        { name: 'npc_trait', role: '读取可继承或随死亡丧失的天赋', fields: 'trait_key · origin · state' },
+        { name: 'action_plan', role: '读取未完成计划与目标', fields: 'npc_id · state · goal_id' },
+        { name: 'event_log', role: '读取死亡原因与相关事实', fields: 'type · actor_ids · target_ids · facts_json' }
+      ],
+      writeTables: [
+        { name: 'npc', role: '写入死亡、出生、身份与健康变化', fields: 'death_tick · health · faction_id · role_id · office_id · state_json' },
+        { name: 'relation', role: '更新亲属、债务与仇恨的承接', fields: 'kind · debt · affinity · flags' },
+        { name: 'faction', role: '更新首领、职位与补缺', fields: 'leader_id · goals_json · resources_json' },
+        { name: 'item_instance', role: '转移财产、物品与绑定关系', fields: 'owner_kind · owner_id · bound_to · state_json' },
+        { name: 'npc_trait', role: '继承、丧失或转移天赋', fields: 'npc_id · trait_key · origin · state' },
+        { name: 'action_plan', role: '终止或转交未完成计划', fields: 'state · goal_id · revision' },
+        { name: 'tension', role: '生成继承争议与空缺矛盾', fields: 'type · subject_ids · stakes · urgency · state' },
+        { name: 'event_log', role: '写入出生、死亡、继承与补缺事件', fields: 'type · actor_ids · target_ids · facts_json · visibility' }
+      ]
+    },
+    {
+      id: 'p10p11',
+      num: '06',
+      phase: 'P10–P11',
+      kicker: 'PROPAGATION / CASCADE',
+      title: '传播 · 连锁 · 压力',
+      color: '#8a5a44',
+      short: '关系图找受影响的人，事件图决定他们会不会行动',
+      summary: 'P10 先更新直接关系、第三方反应、流言与声誉，再沿关系图和事件图展开后继。P11 推进世界压力并预约后续，导演只筛选已经发生的事实，不能改写世界。',
+      detail: '物质影响可以直接结算，认知影响必须亲历或消息送达。单 tick 最多同步展开两层、处理 40 个可选连锁工作项；硬后果不能因为预算忙而丢失。',
+      duration: '每 tick',
+      upstream: '事实事件',
+      downstream: '提交',
+      inputs: [
+        'P7 / P8 / P9 的事实事件与 effect_ledger',
+        '关系邻域、地理暴露、资源依赖、组织职责',
+        'visibility / salience、待送达消息',
+        'tension / cascade_work 队列与 world.pressure'
+      ],
+      outputs: [
+        'relation / memory / npc_belief 更新',
+        'knowledge_delivery 送达记录',
+        '新 event_log 节点与 event_edge',
+        'tension / contract / cascade_work 待办',
+        'world.pressure 阶段与展示列表'
+      ],
+      constraints: [
+        '物质影响可即时，认知影响必须亲历或消息送达后才写入信念。',
+        '单 tick 最多同步 2 层、40 个可选工作项；硬后果不能因预算丢失。',
+        '导演只筛选展示，不能改写事实；接受任务才作为玩家命令进入模拟。',
+        'P10/P11 产生的新主动行为最早在下一 tick 执行。'
+      ],
+      source: '8.10 连锁扩展；8.11 双图联动；8.12 信息传播；8.13 环境调度',
+      anchor: '#8',
+      readTables: [
+        { name: 'event_log', role: '读取事实事件、显著度与可见性', fields: 'type · actor_ids · target_ids · visibility · salience · depth' },
+        { name: 'event_edge', role: '读取已记录的直接因果', fields: 'from_event · to_event · kind · weight · evidence_json' },
+        { name: 'event_template_edge', role: '匹配可能的后继模板', fields: 'from_template · to_template · condition_json · max_fanout · cooldown_ticks' },
+        { name: 'relation', role: '找两跳内受影响的人与立场', fields: 'from_id · to_id · kind · affinity · trust · fear · debt' },
+        { name: 'memory', role: '读取情绪权重，判断反应强度', fields: 'event_id · emotional_weight · source' },
+        { name: 'npc_belief', role: '读取当前相信的版本与置信度', fields: 'belief_key · confidence · updated_tick' },
+        { name: 'knowledge_delivery', role: '读取待送达与已送达消息', fields: 'recipient_id · deliver_tick · confidence · state' },
+        { name: 'tension', role: '读取未解决矛盾与紧迫度', fields: 'type · subject_ids · urgency · deadline_tick' },
+        { name: 'cascade_work', role: '读取排队中的连锁工作与游标', fields: 'work_key · due_tick · priority · state · cursor_json' },
+        { name: 'publication', role: '读取新成果与引用扩散', fields: 'journal_key · novelty · citations · verdict' },
+        { name: 'world', role: '读取世界压力与阶段', fields: 'pressure · tick · state_json' }
+      ],
+      writeTables: [
+        { name: 'relation', role: '写入好感、信任、恐惧、债务与声誉变化', fields: 'affinity · trust · fear · debt · last_contact · flags' },
+        { name: 'memory', role: '写入新记忆与情绪权重', fields: 'npc_id · event_id · emotional_weight · source' },
+        { name: 'npc_belief', role: '写入新信念版本与置信度', fields: 'belief_key · confidence · updated_tick · belief_json' },
+        { name: 'knowledge_delivery', role: '登记消息、渠道与送达时间', fields: 'sender_id · recipient_id · channel · sent_tick · deliver_tick · state' },
+        { name: 'event_log', role: '写入新事件节点与事实', fields: 'type · actor_ids · target_ids · visibility · salience · fingerprint' },
+        { name: 'event_edge', role: '写入新事实边与证据', fields: 'from_event · to_event · kind · weight · evidence_json' },
+        { name: 'tension', role: '新增或合并未解决矛盾', fields: 'type · subject_ids · stakes · urgency · deadline_tick' },
+        { name: 'tension_cause', role: '保留同一张力的全部前因', fields: 'tension_id · event_id' },
+        { name: 'cascade_work', role: '入队、分页或完成连锁工作', fields: 'work_key · due_tick · priority · state · cursor_json' },
+        { name: 'contract', role: '把世界目标投影成可参与任务', fields: 'giver_id · objective_json · deadline_tick · reward_json · state' },
+        { name: 'effect_ledger', role: '应用后继的领域效果', fields: 'source_event_id · tick · group_id · status' },
+        { name: 'world', role: '推进世界压力与阶段', fields: 'pressure · state_json' }
+      ]
+    },
+    {
+      id: 'p12',
+      num: '07',
+      phase: 'P12',
+      kicker: 'COMMIT / PROJECT',
+      title: '原子提交 · 投影',
+      color: '#1f4e46',
+      short: '覆盖率、不变量、哈希全部通过，才用一个事务提交整个回合',
+      summary: 'P12 检查全体 NPC 回合覆盖率与全部不变量，随后在一个 SQLite 事务中提交状态、日志、队列与 tick 号。成功后才发布只读投影；失败则保留上一已提交回合。',
+      detail: '外部读者永远看不到半完成的回合。每 12 tick 可在同库保存完整 world_snapshot，用于回放与恢复；存档不是另一份二进制权威，SQLite 本身就是真值。',
+      duration: '每 tick',
+      upstream: '全部工作状态',
+      downstream: '下一 tick',
+      inputs: [
+        '整回合内存工作副本与已应用效果键',
+        'npc_turn 覆盖率、队列与检查点',
+        '上一 tick_commit.state_hash'
+      ],
+      outputs: [
+        '新 tick_commit 与 state_hash',
+        'SQLite 单事务提交全部状态 / 日志 / 队列',
+        '每 12 tick 的 world_snapshot',
+        '只读投影：人物生平、编年史、事件卡'
+      ],
+      constraints: [
+        '全体存活、新生、当回合死亡 NPC 的 npc_turn 覆盖率必须 100%。',
+        '外键、不变量、哈希全部通过才提交；失败保留上一已提交 tick。',
+        '投影只读，不能反向修改世界；展示预算与模拟预算完全分开。'
+      ],
+      source: '4.2 P12；9.5 存档；13.2 不变量；13.8 综合验收',
+      anchor: '#9',
+      readTables: [
+        { name: 'tick_commit', role: '读取上一提交哈希与命令游标', fields: 'tick · previous_hash · state_hash · npc_count · command_cursor' },
+        { name: 'npc_turn', role: '校验全体 NPC 覆盖与消耗', fields: 'npc_id · tick · status · ap_spent · time_spent' },
+        { name: 'effect_ledger', role: '核对已应用效果与拒绝记录', fields: 'effect_id · group_id · status' },
+        { name: 'save_meta', role: '读取存档格式与内容版本', fields: 'key · value_json' },
+        { name: 'schema_migration', role: '确认数据库结构版本', fields: 'version · checksum · applied_at' }
+      ],
+      writeTables: [
+        { name: 'tick_commit', role: '写入新回合与状态哈希', fields: 'tick · previous_hash · state_hash · npc_count · command_cursor · rules_version' },
+        { name: 'world', role: '提交新 tick 与压力', fields: 'tick · pressure · state_json' },
+        { name: 'all_dirty_tables', kind: 'group', role: '提交本回合所有变更的领域表', fields: 'npc · relation · event_log · item_instance · publication · arcana_ledger …' },
+        { name: 'world_snapshot', role: '每 12 tick 保存完整快照', fields: 'tick · schema_version · rules_version · payload · state_hash' },
+        { name: 'command_log', role: '提交本回合外部输入命令', fields: 'command_id · input_seq · target_tick · payload_json' }
+      ]
+    }
+  ];
+
+  const ORDER = ['p0p2', 'p3', 'p4', 'p5p7', 'branch', 'p8p9', 'p10p11', 'p12'];
+  const byId = Object.fromEntries(STAGES.map(s => [s.id, s]));
+  let selectedId = 'p0p2';
+  let currentTab = 'read';
+  let playTimer = null;
+  let playIndex = 0;
+
+  const detail = document.getElementById('detail');
+  const stageList = document.getElementById('stageList');
+  const playBtn = document.getElementById('playBtn');
+  const playLabel = document.getElementById('playLabel');
+
+  function esc(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function tableCount(list) {
+    return list.filter(item => item.kind !== 'config').length;
+  }
+
+  function ioLabel(stage) {
+    const r = tableCount(stage.readTables);
+    const w = tableCount(stage.writeTables);
+    if (r === 0) return `配置 → ${w} 表`;
+    return `读 ${r} · 写 ${w}`;
+  }
+
+  function stageCard(stage) {
+    const branchClass = stage.id === 'branch' ? ' branch' : '';
+    return `
+      <button class="stage${branchClass}" data-stage="${stage.id}" type="button" aria-pressed="false" style="--c:${stage.color}">
+        <span class="stage-rail"><span class="stage-dot">${stage.num}</span></span>
+        <span class="stage-body">
+          <span class="stage-meta">
+            <span class="phase">${esc(stage.phase)}</span>
+            <span class="stage-kicker">${esc(stage.kicker)}</span>
+            <span class="io-count">${ioLabel(stage)}</span>
+          </span>
+          <strong>${esc(stage.title)}</strong>
+          <span class="stage-desc">${esc(stage.short)}</span>
+        </span>
+        <span class="stage-chev" aria-hidden="true">›</span>
+      </button>`;
+  }
+
+  function tableRows(list) {
+    if (!list.length) return '<div class="empty">本阶段不直接读写运行表。</div>';
+    return list.map(item => {
+      const badges = [
+        item.new ? '<span class="badge new">v0.5</span>' : '',
+        item.newField ? '<span class="badge field">新字段</span>' : '',
+        item.kind === 'config' ? '<span class="badge config">配置</span>' : '',
+        item.kind === 'group' ? '<span class="badge config">集合</span>' : ''
+      ].join('');
+      return `
+        <div class="table-row">
+          <div class="table-headline"><code>${esc(item.name)}</code>${badges}</div>
+          <div class="table-role">${esc(item.role)}</div>
+          <div class="table-fields">${esc(item.fields)}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderDetail(id, tab = 'read') {
+    const stage = byId[id];
+    if (!stage) return;
+    selectedId = id;
+    currentTab = tab;
+    detail.style.setProperty('--c', stage.color);
+
+    const readCount = tableCount(stage.readTables);
+    const writeCount = tableCount(stage.writeTables);
+    const readLabel = readCount === 0 ? '配置输入' : `读 ${readCount} 表`;
+    const list = tab === 'read' ? stage.readTables : stage.writeTables;
+    const tabLabel = tab === 'read' ? `读取 ${readCount}` : `写入 ${writeCount}`;
+
+    detail.innerHTML = `
+      <div class="detail-top">
+        <div class="detail-meta">
+          <span class="detail-phase">${esc(stage.phase)}</span>
+          <span>${esc(stage.kicker)}</span>
+          <span class="detail-index">STAGE ${esc(stage.num)}</span>
+        </div>
+        <h2>${esc(stage.title)}</h2>
+        <p class="detail-summary">${esc(stage.summary)}</p>
+        <div class="io-strip">
+          <span>${readLabel}</span>
+          <span>写 ${writeCount} 表</span>
+          <span>${esc(stage.duration)}</span>
+        </div>
+        <div class="route">
+          <span>${esc(stage.upstream)}</span>
+          <span class="route-arrow">→</span>
+          <b>${esc(stage.title)}</b>
+          <span class="route-arrow">→</span>
+          <span>${esc(stage.downstream)}</span>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="block">
+          <h3><span>01</span>这一步在做什么</h3>
+          <p>${esc(stage.detail)}</p>
+        </div>
+        <div class="block">
+          <h3><span>02</span>输入与产出</h3>
+          <div class="io-grid">
+            <div class="io-box">
+              <h4>输入</h4>
+              <ul>${stage.inputs.map(item => `<li>${esc(item)}</li>`).join('')}</ul>
+            </div>
+            <div class="io-box out">
+              <h4>输出</h4>
+              <ul>${stage.outputs.map(item => `<li>${esc(item)}</li>`).join('')}</ul>
+            </div>
+          </div>
+        </div>
+        <div class="block">
+          <div class="table-head">
+            <h3><span>03</span>数据模型 · ${tabLabel}</h3>
+            <div class="tabs" role="tablist" aria-label="读取或写入表">
+              <button class="tab${tab === 'read' ? ' is-active' : ''}" data-tab="read" type="button" role="tab" aria-selected="${tab === 'read'}">读取 ${readCount}</button>
+              <button class="tab${tab === 'write' ? ' is-active' : ''}" data-tab="write" type="button" role="tab" aria-selected="${tab === 'write'}">写入 ${writeCount}</button>
+            </div>
+          </div>
+          <div class="table-list">${tableRows(list)}</div>
+        </div>
+        <div class="constraint">
+          <h4>硬约束 / 不要破坏</h4>
+          <ul>${stage.constraints.map(item => `<li>${esc(item)}</li>`).join('')}</ul>
+        </div>
+        <div class="source">
+          <span>出处</span>
+          <a href="世界演化系统复刻设计文档_奥术神座提取版.html${stage.anchor}" target="_blank" rel="noopener">${esc(stage.source)}</a>
+        </div>
+      </div>`;
+  }
+
+  function setActiveStage(id) {
+    document.querySelectorAll('.stage[data-stage]').forEach(button => {
+      const active = button.dataset.stage === id;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  function selectStage(id, options = {}) {
+    if (!byId[id]) return;
+    setActiveStage(id);
+    renderDetail(id, 'read');
+    if (options.scroll && window.innerWidth <= 1080) {
+      detail.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function stopPlay() {
+    if (playTimer) {
+      clearTimeout(playTimer);
+      playTimer = null;
+    }
+    document.querySelectorAll('.stage.is-playing').forEach(el => el.classList.remove('is-playing'));
+    playBtn.classList.remove('is-playing');
+    playBtn.setAttribute('aria-pressed', 'false');
+    playLabel.textContent = '播放动线';
+  }
+
+  function stepPlay() {
+    const id = ORDER[playIndex];
+    if (!id) {
+      stopPlay();
+      return;
+    }
+    selectStage(id);
+    document.querySelectorAll('.stage.is-playing').forEach(el => el.classList.remove('is-playing'));
+    const active = document.querySelector(`.stage[data-stage="${id}"]`);
+    if (active) active.classList.add('is-playing');
+    playIndex += 1;
+    playTimer = setTimeout(stepPlay, 2100);
+  }
+
+  function startPlay() {
+    stopPlay();
+    playIndex = 0;
+    selectStage(ORDER[0]);
+    playBtn.classList.add('is-playing');
+    playBtn.setAttribute('aria-pressed', 'true');
+    playLabel.textContent = '停止演示';
+    const active = document.querySelector(`.stage[data-stage="${ORDER[0]}"]`);
+    if (active) active.classList.add('is-playing');
+    playIndex = 1;
+    playTimer = setTimeout(stepPlay, 2100);
+  }
+
+  stageList.innerHTML = ORDER.map(id => stageCard(byId[id])).join('');
+  renderDetail(selectedId, 'read');
+  setActiveStage(selectedId);
+
+  document.addEventListener('click', event => {
+    const stageButton = event.target.closest('[data-stage]');
+    if (stageButton) {
+      stopPlay();
+      selectStage(stageButton.dataset.stage, { scroll: true });
+      return;
+    }
+    const tabButton = event.target.closest('[data-tab]');
+    if (tabButton) {
+      renderDetail(selectedId, tabButton.dataset.tab);
+    }
+  });
+
+  playBtn.addEventListener('click', () => {
+    if (playTimer) stopPlay();
+    else startPlay();
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      stopPlay();
+      return;
+    }
+    if (event.target.closest('button')) return;
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const current = ORDER.indexOf(selectedId);
+    const delta = event.key === 'ArrowDown' ? 1 : -1;
+    const next = Math.min(ORDER.length - 1, Math.max(0, (current === -1 ? 0 : current + delta)));
+    stopPlay();
+    selectStage(ORDER[next]);
+    const active = document.querySelector(`.stage[data-stage="${ORDER[next]}"]`);
+    if (active) active.focus({ preventScroll: true });
+  });
+</script>
+</body>
+</html>

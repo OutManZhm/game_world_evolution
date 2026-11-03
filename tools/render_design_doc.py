@@ -1,20 +1,29 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 from pathlib import Path
 
 import markdown
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "docs" / "世界演化系统复刻设计文档.md"
-OUTPUT = ROOT / "docs" / "世界演化系统复刻设计文档.html"
+# 默认渲染基础版；用 DOC_SOURCE 指向题材化版本即可渲染对应 HTML（输出与源文件同名）
+SOURCE = Path(
+    os.environ.get("DOC_SOURCE", ROOT / "docs" / "世界演化系统复刻设计文档.md")
+).resolve()
+OUTPUT = SOURCE.with_suffix(".html")
 
 text = SOURCE.read_text(encoding="utf-8")
 version_match = re.search(r"^> 版本：(v[\d.]+)", text, re.M)
 if version_match is None:
     raise ValueError("Document version is missing")
 version = html.escape(version_match.group(1))
+
+date_match = re.search(r"^> 版本：v[\d.]+（(\d{4}-\d{2}-\d{2})", text, re.M)
+if date_match is None:
+    raise ValueError("Document date is missing")
+doc_date = html.escape(date_match.group(1))
 
 md = markdown.Markdown(
     extensions=[
@@ -183,7 +192,7 @@ code {{ font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; b
       <p class="subtitle">参照《鬼谷八荒》《太吾绘卷》的世界进程与 NPC 演化机制，给出一套可实施、可测试、可扩展的系统架构。</p>
       <div class="hero-meta">
         <span class="pill">版本 {version}</span>
-        <span class="pill">2026-10-24</span>
+        <span class="pill">{doc_date}</span>
         <span class="pill">行为级复刻</span>
         <span class="pill">C# / Unity / SQLite</span>
         <span class="pill">含 MVP 与验收标准</span>

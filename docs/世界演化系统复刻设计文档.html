@@ -148,8 +148,8 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
       <h1>世界演化系统复刻设计文档</h1>
       <p class="subtitle">参照《鬼谷八荒》《太吾绘卷》的世界进程与 NPC 演化机制，给出一套可实施、可测试、可扩展的系统架构。</p>
       <div class="hero-meta">
-        <span class="pill">版本 v0.3</span>
-        <span class="pill">2026-10-24</span>
+        <span class="pill">版本 v0.4</span>
+        <span class="pill">2026-11-02</span>
         <span class="pill">行为级复刻</span>
         <span class="pill">C# / Unity / SQLite</span>
         <span class="pill">含 MVP 与验收标准</span>
@@ -159,7 +159,8 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
 <blockquote>
 <p>参照对象：《鬼谷八荒》《太吾绘卷》<br />
 目标：设计一套可工程化落地的“NPC 社会模拟 + 世界事件演化”系统<br />
-版本：v0.3（2026-10-24，全体 NPC 回合闭环、持续因果、定时环境事件与 SQLite 持久化）<br />
+版本：v0.4（2026-11-02，新增人物资质与天赋词条体系、玩家作为特殊 NPC 的建模基线）<br />
+上一版：v0.3（2026-10-24，全体 NPC 回合闭环、持续因果、定时环境事件与 SQLite 持久化）<br />
 文档性质：行为级复刻 / 原创实现规格，不是反编译、资源提取或私服方案</p>
 </blockquote>
 <hr />
@@ -875,6 +876,37 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
 </table>
 <p>这样既保留“街上的人都有名字”的体验，又不会让 tick 变成 O(n²)。</p>
 <p>“每个 NPC”指全部独立建模、具有稳定 ID 的人物，包括背景 NPC。Cohort 是明确标注的匿名人口统计，不提供个人人生保证；如果产品要求每个居民都有完整人生，该居民必须从生成时就建成 NPC。匿名人口转为 NPC 时保存来源与生成时刻，不虚构其此前逐回合行为。</p>
+<h4 id="531-npc">5.3.1 玩家是特殊 NPC</h4>
+<p>玩家角色不是独立于模拟之外的实体，而是 <code>npc</code> 表中的一条普通记录，与所有 NPC 共用同一套身份、资质、需求、天赋、关系、信念、回合与行动结构。</p>
+<p>差异只允许出现在三处：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>NPC</th>
+<th>玩家</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>意图来源</td>
+<td>效用函数按 seed 选择</td>
+<td>外部输入经 <code>command_log</code> 写入</td>
+</tr>
+<tr>
+<td>天赋获取</td>
+<td>从卡池按 seed 自动抽取</td>
+<td>开局从候选池中手动选择</td>
+</tr>
+<tr>
+<td>可读信息</td>
+<td>只读自身信念层</td>
+<td>可读叙事层投影</td>
+</tr>
+</tbody>
+</table>
+<p>除此之外没有特权：玩家同样受权限、AP、时间、前置条件和信息延迟约束，同样会因行为进入他人的关系图与信念。<strong>玩家一旦不是 <code>npc</code> 记录，就无法被关系索引、不能被他人感知和记恨、收不到 <code>knowledge_delivery</code></strong>，附录 E 中“债主记恨玩家”这条链路也就不成立。</p>
+<p>玩家的意图在 P5 阶段替换该 NPC 的候选生成，其余阶段（感知、执行、结算、回合记录）与 NPC 完全一致，因此不存在第二套结算代码。</p>
 <h3 id="54">5.4 经济与资源</h3>
 <p>不要做完整市场经济。做<strong>局部资源存量 + 月度产出/消耗 + 价格信号</strong>：</p>
 <ul>
@@ -976,10 +1008,11 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
 <li>势力分布与初始边界；</li>
 <li>人口 cohort；</li>
 <li>核心 NPC 与家族；</li>
+<li>资质与天赋词条抽取（先定资质定天赋，见 6.16）；</li>
 <li>初始关系网（亲缘、师承、好友、仇敌、债务）；</li>
 <li>经济初值（确保没有一开始就饿死全城）；</li>
 <li>初始张力（3–5 个可被玩家发现的矛盾）；</li>
-<li>约束校验（年龄、亲缘、职位、资源）。</li>
+<li>约束校验（年龄、亲缘、职位、资源、资质与天赋互斥）。</li>
 </ol>
 <p>生成后必须跑一个“静默 12 tick”：</p>
 <ul>
@@ -998,6 +1031,7 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
 <th>层</th>
 <th>内容</th>
 <th>更新频率</th>
+<th>落库位置</th>
 </tr>
 </thead>
 <tbody>
@@ -1005,54 +1039,71 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
 <td>身份</td>
 <td>id、姓名、性别、出生、家族、籍贯</td>
 <td>极少</td>
+<td><code>npc</code> 结构化字段</td>
 </tr>
 <tr>
-<td>属性</td>
+<td>资质</td>
 <td>根骨、悟性、魅力、体质、意志</td>
 <td>成长时</td>
+<td><code>npc</code> 结构化字段（v0.4 起，见 6.16）</td>
+</tr>
+<tr>
+<td>天赋</td>
+<td>先天与后天词条、来源、获得时刻</td>
+<td>生成/事件</td>
+<td><code>npc_trait</code> 表（v0.4 新增）</td>
 </tr>
 <tr>
 <td>状态</td>
 <td>健康、伤势、中毒、疲劳、心情</td>
 <td>每月/事件</td>
+<td><code>npc.health</code> + <code>state_json</code></td>
 </tr>
 <tr>
 <td>能力</td>
 <td>境界、功法、技艺、战力评级</td>
 <td>每月</td>
+<td><code>npc.realm/power</code> + <code>state_json</code></td>
 </tr>
 <tr>
 <td>资源</td>
 <td>金钱、物品、地盘、人脉</td>
 <td>事件/每月</td>
+<td><code>inventory_json</code></td>
 </tr>
 <tr>
 <td>需求</td>
 <td>安全、健康、财富、修为、归属、声望、恩怨</td>
 <td>每月</td>
+<td><code>needs_json</code></td>
 </tr>
 <tr>
 <td>目标</td>
 <td>终身志向、阶段目标、本月意图</td>
 <td>月/季/年</td>
+<td><code>action_plan.goal_id</code> + <code>intent</code></td>
 </tr>
 <tr>
 <td>关系</td>
 <td>有向关系边</td>
 <td>事件</td>
+<td><code>relation</code> 表</td>
 </tr>
 <tr>
 <td>信念</td>
 <td>知道的事实、传闻、怀疑</td>
 <td>事件/传播</td>
+<td><code>npc_belief</code> 表</td>
 </tr>
 <tr>
 <td>记忆</td>
 <td>重要事件 + 情绪权重</td>
 <td>事件，缓慢衰减</td>
+<td><code>memory</code> 表</td>
 </tr>
 </tbody>
 </table>
+<p>v0.2–v0.3 的“属性”层只停留在概念上，<code>npc</code> 表没有对应字段，导致成长、突破和天赋都无法落数。v0.4 把这五项资质提升为结构化列，并新增天赋词条层，使 <code>traitBonus</code> 一类修正有可校验的落点。<strong>性格标签不等于天赋</strong>，两者的边界见 6.16.1。</p>
 <h3 id="62">6.2 性格与价值观</h3>
 <p>不要只用“善恶”一个轴。建议 6 个连续轴（-100 到 100）：</p>
 <table>
@@ -1111,6 +1162,7 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
 <li><code>贪财</code>：偷窃/抢夺的收益权重 +，风险权重 -；</li>
 <li><code>怕死</code>：战斗/复仇的 risk penalty +。</li>
 </ul>
+<p>这些标签是<strong>倾向</strong>，只影响候选行为的打分权重，不改变人物的能力上限。改变上限、预算和可用行为的是 6.16 的天赋词条。一个人可以“性格怕死”同时“天赋精力充沛”，两者不冲突，也不应合并成同一张表。</p>
 <h3 id="63">6.3 需求与目标</h3>
 <p>需求不是“心情条”，而是行为压力的来源。</p>
 <table>
@@ -1485,6 +1537,7 @@ code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; ba
   - agePenalty           // 老年 -1
 clamp 0..6
 </code></pre></div>
+<p><code>traitBonus</code> 来自该 NPC 已持有天赋词条的累加值，按 <code>stack_group</code> 去重，明细读 <code>npc_trait</code> 指向的配置定义（见 6.16）。<code>ap_budget</code> 列保存的是生成时算定的<strong>结果值</strong>，天赋增减在生成阶段结算一次；运行期内新增的天赋（<code>origin = acquire</code>）在下个 tick 开头重算并回写。</p>
 <p>行动按成本消耗：</p>
 <table>
 <thead>
@@ -1731,6 +1784,167 @@ ActionExecution: id, stepId, tick, round, state, apSpent, timeSpent,
 <h3 id="615">6.15 状态变化的长期反馈</h3>
 <p>行动结果必须回写对应领域：资源真实转移、健康改变、关系/记忆更新、计划进度变化、组织目标修正，并记录造成变更的事件 ID。NPC 下回合从这些已变状态产生新需求，而不是只根据上一条剧情文本续写故事。</p>
 <p>同一人物可以同时受多件事影响，例如“母亲生病 + 雇主停工 + 城门封锁”共同导致借债；记录全部直接原因，不强行裁成单一前因。目标完成、失败、失去意义均有终止记录，避免永远复仇、永远催债或永久执行过期命令。</p>
+<h3 id="616">6.16 资质与天赋词条</h3>
+<h4 id="6161">6.16.1 三种概念的边界</h4>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>是什么</th>
+<th>存储</th>
+<th>影响上限吗</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>资质</td>
+<td>天生数值：根骨、悟性、魅力、体质、意志</td>
+<td><code>npc</code> 五个结构化列</td>
+<td>是，决定成长速度与突破成功率</td>
+</tr>
+<tr>
+<td>天赋词条</td>
+<td>离散、有名字、有代价的修正项</td>
+<td><code>npc_trait</code> 行 + 配置定义</td>
+<td>是，AP、权限、可用行为、需求倾向</td>
+</tr>
+<tr>
+<td>性格标签</td>
+<td>连续轴的离散描述，如记仇、护短</td>
+<td><code>personality_json</code></td>
+<td>否，只改打分权重</td>
+</tr>
+</tbody>
+</table>
+<p>一句话：<strong>资质是刻度，天赋是开关与加成，性格标签是偏好。</strong> 三者不能合并，否则“他为什么能做这件事”将无法回答。</p>
+<h4 id="6162">6.16.2 定义与持有必须分开</h4>
+<table>
+<thead>
+<tr>
+<th>半</th>
+<th>内容</th>
+<th>存哪</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>定义</td>
+<td>id、显示名、tier、cost、exclusive、effects</td>
+<td>JSON/YAML 配置</td>
+<td>数值要反复调，热更不能动存档结构</td>
+</tr>
+<tr>
+<td>持有</td>
+<td>谁有哪个词条、何时、从哪来</td>
+<td><code>npc_trait</code> 表</td>
+<td>运行状态，需要索引、反查与继承</td>
+</tr>
+</tbody>
+</table>
+<p>存档行只存 <code>trait_key</code>，其余读配置，不复制定义。处理方式与 <code>event_template_edge</code> 一致。</p>
+<h4 id="6163">6.16.3 卡池是规则，不是数据</h4>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>范围</th>
+<th>绑定依据</th>
+<th>存哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>公共池</td>
+<td>全体人物</td>
+<td>无</td>
+<td>配置</td>
+</tr>
+<tr>
+<td>原型池</td>
+<td>一类人</td>
+<td><code>role_id</code>、<code>faction_id</code>、<code>location_id</code>、出身</td>
+<td>配置，用 <code>bind</code> 条件声明</td>
+</tr>
+</tbody>
+</table>
+<p><strong>不为每个 NPC 预存一份专属池。</strong> 10k 个 NPC 就是 10k 份池内容，其中绝大部分条目永远不会被抽中，等于把“可能性”当“事实”存档。个体差异由 <code>seed + npc_id + 原型池</code> 的确定性抽取保证，不需要预先物化。</p>
+<p>只有玩家角色的出身例外：出身键由玩家开局选定后写入 <code>state_json</code>，池内容仍来自配置。</p>
+<h4 id="6164">6.16.4 抽取与确定性</h4>
+<ul>
+<li>走 9.4 的 <code>Life</code> 随机流，键为 <code>(Life, seed, npcId, "trait", drawIndex)</code>，不新开全局随机；</li>
+<li>时机在 5.7 第 6 步：家族生成之后、初始关系网之前，因为天赋会影响初始 <code>affinity</code> 和职位竞争；</li>
+<li>每次抽取把池 ID 写进 <code>draw_pool</code>，否则调试器只能说“他有”，说不出“为什么有”；</li>
+<li>数量上限、互斥、稀有度占比由配置声明并在运行时校验，不用 SQLite 约束表达。</li>
+</ul>
+<h4 id="6165">6.16.5 效果在哪里被读取</h4>
+<table>
+<thead>
+<tr>
+<th>读取点</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>属性与预算计算</td>
+<td><code>attribute_delta</code>、<code>ap_bonus</code> 进入 <code>apBudget()</code> 与 6.8 成长公式</td>
+</tr>
+<tr>
+<td>候选过滤</td>
+<td><code>unlock_action</code> / <code>forbid_action</code> 决定行为能否进入候选集</td>
+</tr>
+<tr>
+<td>事件触发</td>
+<td>附录 D.2 的 <code>actorHasTrait</code> 条件</td>
+</tr>
+</tbody>
+</table>
+<p>不把天赋效果落成修正行：2k NPC × 3 词条 = 6k 行，改一次数值要刷全表；只有像环境事件那样需要明确生命周期管理的修正，才值得用 <code>environment_modifier</code>。</p>
+<h4 id="6166">6.16.6 获得、丧失与继承</h4>
+<table>
+<thead>
+<tr>
+<th>origin</th>
+<th>含义</th>
+<th>来源</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>innate</code></td>
+<td>先天，生成时抽取</td>
+<td>开局</td>
+</tr>
+<tr>
+<td><code>inherit</code></td>
+<td>血脉或师承传承</td>
+<td>6.10 继承</td>
+</tr>
+<tr>
+<td><code>acquire</code></td>
+<td>后天习得</td>
+<td>修炼、奇遇、事件效果</td>
+</tr>
+<tr>
+<td><code>event</code></td>
+<td>被事件强制附加</td>
+<td>诅咒、伤残、奇遇</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>死亡时按 6.10 处理：<code>inherit</code> 类可传继承人，<code>acquire</code> 类不传；</li>
+<li>丧失要留痕：写 <code>state = lost</code> 或删除行并记 <code>source_event_id</code>，不静默消失；</li>
+<li>同一 <code>trait_key</code> 不重复持有（<code>UNIQUE(npc_id, trait_key)</code>），可叠加的用 <code>stack_group</code> 在配置层表达。</li>
+</ul>
+<h4 id="6167">6.16.7 玩家开局选择</h4>
+<p>玩家与其他 NPC 共用池、配置和校验，唯一区别是抽取环节换成人工挑选：</p>
+<div class="code-wrap"><button class="copy-btn" type="button">复制</button><pre><code class="language-text">候选 = 公共池（按出身过滤）+ 出身原型池
+约束 = 点数预算、exclusive、必得项
+结果 = 玩家确认后写入 npc_trait，origin = innate，draw_pool = &quot;manual&quot;
+</code></pre></div>
+<p>玩家不能突破点数预算，也选不到互斥组合：这条校验与 NPC 抽取共用同一份配置和同一个校验函数，不存在“玩家专用规则”。</p>
 <hr />
 <h2 id="7">7. 关系、流言与声誉</h2>
 <h3 id="71">7.1 有向多重图</h3>
@@ -2653,9 +2867,14 @@ CREATE TABLE npc (
   reach           TEXT NOT NULL DEFAULT 'LOCAL',
   ap_budget       INTEGER NOT NULL DEFAULT 2 CHECK (ap_budget BETWEEN 0 AND 6),
   location_id     INTEGER NOT NULL REFERENCES locale(id),
-  health          INTEGER NOT NULL,
+  health          INTEGER NOT NULL,                    -- 当前健康，随年龄/伤病变化
   realm           INTEGER NOT NULL,
   power           INTEGER NOT NULL,
+  constitution    INTEGER NOT NULL CHECK (constitution BETWEEN 0 AND 100),  -- 根骨
+  comprehension   INTEGER NOT NULL CHECK (comprehension BETWEEN 0 AND 100), -- 悟性
+  charm           INTEGER NOT NULL CHECK (charm BETWEEN 0 AND 100),         -- 魅力
+  physique        INTEGER NOT NULL CHECK (physique BETWEEN 0 AND 100),      -- 天生体质，区别于 health
+  willpower       INTEGER NOT NULL CHECK (willpower BETWEEN 0 AND 100),     -- 意志
   personality_json TEXT NOT NULL,
   needs_json      TEXT NOT NULL,
   inventory_json  TEXT NOT NULL,
@@ -2798,8 +3017,24 @@ CREATE TABLE memory (
   created_tick    INTEGER NOT NULL,
   PRIMARY KEY (npc_id, event_id)
 );
+
+CREATE TABLE npc_trait (
+  id              INTEGER PRIMARY KEY,
+  npc_id          INTEGER NOT NULL REFERENCES npc(id),
+  trait_key       TEXT NOT NULL,             -- 引用配置中的天赋定义，不复制内容
+  origin          TEXT NOT NULL CHECK (origin IN ('innate','inherit','acquire','event')),
+  state           TEXT NOT NULL DEFAULT 'active' CHECK (state IN ('active','lost')),
+  draw_pool       TEXT NOT NULL,             -- 来自哪个卡池，供调试与审计
+  acquired_tick   INTEGER NOT NULL,
+  source_event_id INTEGER REFERENCES event_log(id),
+  state_json      TEXT NOT NULL CHECK (json_valid(state_json)),
+  UNIQUE (npc_id, trait_key)
+);
+CREATE INDEX idx_trait_key ON npc_trait(trait_key, npc_id);
+CREATE INDEX idx_trait_npc ON npc_trait(npc_id, state);
 </code></pre></div>
 <p><code>intent</code> 保存候选被选中的结果，<code>action_execution</code> 保存实际尝试与消耗，两者不是重复执行入口。<code>score</code> 为量化后的整数；关系强度、概率和衰减统一定点。<code>cause_ids</code> 是 <code>event_edge</code> 的缓存，提交前校验一致。<code>event_log</code> 归档不删除在途外键引用。</p>
+<p><code>npc_trait</code> 只保存持有关系，词条的名称、效果、互斥与卡池归属全部留在内容配置中；<code>trait_key</code> 与 <code>draw_pool</code> 都必须能在配置注册表中找到，提交前校验。重新获得同一词条复用已有行并把 <code>state</code> 改回 <code>active</code>，历史由事件追溯，不新增重复行。</p>
 <h3 id="102-npc">10.2 NPC 数据示例</h3>
 <div class="code-wrap"><button class="copy-btn" type="button">复制</button><pre><code class="language-json">{
   &quot;id&quot;: 1024,
@@ -2812,6 +3047,21 @@ CREATE TABLE memory (
   &quot;realm&quot;: 2,
   &quot;health&quot;: 78,
   &quot;power&quot;: 42,
+  &quot;attributes&quot;: {
+    &quot;constitution&quot;: 40,
+    &quot;comprehension&quot;: 55,
+    &quot;charm&quot;: 62,
+    &quot;physique&quot;: 45,
+    &quot;willpower&quot;: 50
+  },
+  &quot;traits&quot;: [
+    {
+      &quot;key&quot;: &quot;trait.herb_sense&quot;,
+      &quot;origin&quot;: &quot;innate&quot;,
+      &quot;pool&quot;: &quot;pool.innate.apprentice_herb&quot;,
+      &quot;acquiredTick&quot;: 120
+    }
+  ],
   &quot;personality&quot;: {
     &quot;morality&quot;: 20,
     &quot;order&quot;: 15,
@@ -2837,6 +3087,7 @@ CREATE TABLE memory (
   }
 }
 </code></pre></div>
+<p>示例中的 <code>attributes</code> 对应 <code>npc</code> 的五个资质列，<code>traits</code> 对应 <code>npc_trait</code> 行；<code>goals</code> 是逻辑视图，<code>current</code> 落 <code>action_plan.goal_id</code>，<code>lifetime</code> 与 <code>stage</code> 保存在 <code>state_json.goals</code>，<code>npc</code> 表本身没有 goals 列。</p>
 <h3 id="103">10.3 存档清单</h3>
 <div class="code-wrap"><button class="copy-btn" type="button">复制</button><pre><code class="language-json">{
   &quot;formatVersion&quot;: 4,
@@ -3194,6 +3445,13 @@ CREATE TABLE world_snapshot (
 </tr>
 <tr>
 <td>P0</td>
+<td>五项资质、天赋词条与卡池抽取</td>
+<td>✅</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>P0</td>
 <td>身份权限、AP 预算、Directive 委派</td>
 <td>✅</td>
 <td></td>
@@ -3382,6 +3640,8 @@ CREATE TABLE world_snapshot (
 <h3 id="124-mvp">12.4 内容预算（MVP）</h3>
 <ul>
 <li>8 个性格标签；</li>
+<li>24 个天赋词条（含 6 个稀有先天）；</li>
+<li>6 个卡池（3 公共、2 原型、1 玩家出身）；</li>
 <li>20 个行为；</li>
 <li>30 个事件模板；</li>
 <li>10 个任务模板；</li>
@@ -3431,8 +3691,8 @@ CREATE TABLE world_snapshot (
 </tr>
 <tr>
 <td>2</td>
-<td>300 NPC、需求、回合记录、6 类行为</td>
-<td>每人每回合有真实结算</td>
+<td>300 NPC、资质、天赋词条、需求、回合记录、6 类行为</td>
+<td>每人每回合有真实结算，天赋可追溯到卡池</td>
 </tr>
 <tr>
 <td>3</td>
@@ -3541,6 +3801,7 @@ CREATE TABLE world_snapshot (
 <li>人口不出现负值。</li>
 </ul>
 <p>新增必须检查：全体存活/新生/当回合死亡 NPC 回合记录覆盖率 100%；行动依赖图无环；前置未完成不得执行后置；复合转移不产生负库存；消息送达前没有对应的非亲历信念；同一环境发生序号、效果键及命令 ID 不重复生效；<code>world.tick</code> 与最新 <code>tick_commit</code> 一致；数据库外键和完整性检查通过。</p>
+<p>资质与天赋必须检查：五项资质均在 0–100 且与生成种子一致；每人 <code>npc_trait</code> 数量不超过配置上限，且不出现 <code>exclusive</code> 组合；<code>trait_key</code> 与 <code>draw_pool</code> 必须存在于配置注册表；同一 <code>(npc_id, trait_key)</code> 只保留一条 <code>active</code> 记录；<code>origin</code> 与 <code>acquired_tick</code>、<code>source_event_id</code> 相互一致；<code>ap_budget</code> 等于 <code>apBudget()</code> 在生成时或最近一次天赋变更后的计算结果。</p>
 <h3 id="133">13.3 确定性测试</h3>
 <ul>
 <li>同一 seed + 同一命令序列，状态哈希一致；</li>
@@ -3553,6 +3814,7 @@ CREATE TABLE world_snapshot (
 <p>跑 200 年，每 12 tick 记录：</p>
 <ul>
 <li>人口、年龄结构、境界分布；</li>
+<li>资质均值分布与天赋词条分布（含稀有词条占比）；</li>
 <li>职位空缺率；</li>
 <li>仇敌边比例；</li>
 <li>平均关系数；</li>
@@ -3566,6 +3828,7 @@ CREATE TABLE world_snapshot (
 <li>无未处理异常；</li>
 <li>人口在初始值的 0.6–1.6 倍内波动；</li>
 <li>最高境界人数不超过总人口 5%；</li>
+<li>稀有天赋（<code>tier</code> = rare 及以上）持有者不超过总人口 5%；</li>
 <li>职位空缺率 &lt; 10%；</li>
 <li>没有单一势力控制 &gt; 70% 领地；</li>
 <li>事件类型不出现 &gt; 40% 由同一模板贡献。</li>
@@ -4175,6 +4438,55 @@ CREATE TABLE world_snapshot (
 }
 </code></pre></div>
 <p>这是一次性旱灾；把 <code>intervalTicks</code> 设为 12、<code>repeatLimit</code> 设为 null 即为年度循环。500 表示基础产出的 50%，每 tick 重算本实例修正而非反复乘以 0.5。不同修正组的组合顺序固定并配置上限。示例中的结束恢复只恢复生产率，库存通过之后的真实生产逐步补足，不自动还债或撤回迁徙。</p>
+<h3 id="d5">D.5 天赋词条与卡池</h3>
+<p>词条定义：</p>
+<div class="code-wrap"><button class="copy-btn" type="button">复制</button><pre><code class="language-json">{
+  &quot;id&quot;: &quot;trait.herb_sense&quot;,
+  &quot;displayKey&quot;: &quot;trait.herb_sense.name&quot;,
+  &quot;tier&quot;: &quot;innate&quot;,
+  &quot;cost&quot;: 1,
+  &quot;exclusive&quot;: [&quot;trait.clumsy&quot;, &quot;trait.weak_constitution&quot;],
+  &quot;stackGroup&quot;: &quot;comprehension_bonus&quot;,
+  &quot;effects&quot;: [
+    { &quot;kind&quot;: &quot;attribute_delta&quot;, &quot;attribute&quot;: &quot;comprehension&quot;, &quot;value&quot;: 10 },
+    { &quot;kind&quot;: &quot;need_tendency&quot;, &quot;need&quot;: &quot;mastery&quot;, &quot;value&quot;: 8 }
+  ],
+  &quot;narrativeKey&quot;: &quot;trait.herb_sense.desc&quot;
+}
+</code></pre></div>
+<p>原型卡池：</p>
+<div class="code-wrap"><button class="copy-btn" type="button">复制</button><pre><code class="language-json">{
+  &quot;id&quot;: &quot;pool.innate.apprentice_herb&quot;,
+  &quot;scope&quot;: &quot;archetype&quot;,
+  &quot;bind&quot;: { &quot;roleId&quot;: &quot;apprentice&quot;, &quot;siteKind&quot;: &quot;herb_shop&quot; },
+  &quot;entries&quot;: [
+    { &quot;trait&quot;: &quot;trait.herb_sense&quot;, &quot;weight&quot;: 80 },
+    { &quot;trait&quot;: &quot;trait.steady_hand&quot;, &quot;weight&quot;: 60 },
+    { &quot;trait&quot;: &quot;trait.frail&quot;, &quot;weight&quot;: 40 }
+  ],
+  &quot;draw&quot;: { &quot;count&quot;: 1, &quot;stream&quot;: &quot;Life&quot; },
+  &quot;stackingPolicy&quot;: &quot;unique&quot;,
+  &quot;rarityCap&quot;: { &quot;rare&quot;: 0.05 }
+}
+</code></pre></div>
+<p>玩家出身池（同一套校验，抽取方式换成人工挑选）：</p>
+<div class="code-wrap"><button class="copy-btn" type="button">复制</button><pre><code class="language-json">{
+  &quot;id&quot;: &quot;pool.origin.herb_family&quot;,
+  &quot;scope&quot;: &quot;player_origin&quot;,
+  &quot;pools&quot;: [&quot;pool.innate.common&quot;, &quot;pool.innate.apprentice_herb&quot;, &quot;pool.origin.herb_family_exclusive&quot;],
+  &quot;budget&quot;: 3,
+  &quot;draw&quot;: { &quot;count&quot;: 2, &quot;mode&quot;: &quot;manual&quot; },
+  &quot;guaranteed&quot;: [&quot;trait.herb_sense&quot;]
+}
+</code></pre></div>
+<p>约束：</p>
+<ul>
+<li>词条的 <code>effects.kind</code> 只能使用已注册的领域效果，v0.4 新增 <code>attribute_delta</code>、<code>ap_bonus</code>、<code>need_tendency</code>、<code>unlock_action</code>、<code>forbid_action</code> 五种，必须先在内容管线注册；</li>
+<li><code>attribute</code> 只能取五项资质的枚举值，不能指向 <code>state_json</code> 里的键；</li>
+<li><code>draw.stream</code> 必须指向 9.4 已命名的随机流，不允许写 <code>global</code>；</li>
+<li>池条目只能引用已注册的 <code>trait.id</code>，<code>bind</code> 只能引用 <code>npc</code> 表已有字段，不允许按人物姓名或事件文本匹配；</li>
+<li>池与词条改动必须跑固定种子回归，检查稀有度占比与 AP 分布是否漂移（D.3 的统一要求）。</li>
+</ul>
 <hr />
 <h2 id="e">附录 E：双图连锁完整示例</h2>
 <p>以“债务到期”为根事件，演示关系、信息、行动与世界状态如何跨回合相互影响。下列为固定条件下的一条实际分支，其他选择允许产生不同结果。</p>
